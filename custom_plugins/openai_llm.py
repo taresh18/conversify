@@ -42,8 +42,48 @@ from openai.types.chat.chat_completion_chunk import Choice
 
 from .utils import ChatModels, build_oai_message, build_oai_function_description
 
+from livekit import agents
+
 import logging
 logger = logging.getLogger(__name__)
+
+import re
+
+def truncate_base64_images(messages):
+    truncated_messages = []
+
+    for msg in messages:
+        content = msg.get('content')
+
+        # If content is a list (e.g., for multimodal input with image)
+        if isinstance(content, list):
+            new_content = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    url = item.get("image_url", {}).get("url", "")
+                    if url.startswith("data:image/") and "base64," in url:
+                        # Truncate base64 content
+                        new_url = url.split("base64,", 1)[0] + "base64,[TRUNCATED]"
+                        new_content.append({
+                            "type": "image_url",
+                            "image_url": {"url": new_url}
+                        })
+                    else:
+                        new_content.append(item)
+            msg = {**msg, "content": new_content}
+        
+        # If content is a string, truncate inline base64 data URLs (edge case)
+        elif isinstance(content, str):
+            truncated = re.sub(
+                r'data:image/[^;]+;base64,[A-Za-z0-9+/=]+',
+                lambda m: m.group(0).split("base64,", 1)[0] + "base64,[TRUNCATED]",
+                content
+            )
+            msg = {**msg, "content": truncated}
+
+        truncated_messages.append(msg)
+
+    return truncated_messages
 
 
 @dataclass
@@ -202,38 +242,38 @@ class LLMStream(llm.LLMStream):
                 ]
             else:
                 tools = None
-
-            tools = None
-
+            
             opts: dict[str, Any] = {
                 "tools": tools,
-                "parallel_tool_calls": self._parallel_tool_calls if tools else None,
-                "tool_choice": (
-                    {"type": "function", "function": {"name": self._tool_choice.name}}
-                    if isinstance(self._tool_choice, ToolChoice)
-                    else self._tool_choice
-                )
-                if tools is not None
-                else None,
-                "tools": [],
-                "temperature": self._temperature,
-                "metadata": self._llm._opts.metadata,
-                "max_tokens": self._llm._opts.max_tokens,
-                "store": self._llm._opts.store,
-                "n": self._n,
-                "stream": True,
-                "stream_options": {"include_usage": True},
-                "user": self._user or openai.NOT_GIVEN,
+                # "parallel_tool_calls": self._parallel_tool_calls if tools else None,
+                # "tool_choice": (
+                #     {"type": "function", "function": {"name": self._tool_choice.name}}
+                #     if isinstance(self._tool_choice, ToolChoice)
+                #     else self._tool_choice
+                # )
+                # if tools is not None
+                # else None,
+                # "tools": [],
+                # "temperature": self._temperature,
+                # "metadata": self._llm._opts.metadata,
+                # "max_tokens": self._llm._opts.max_tokens,
+                # "store": self._llm._opts.store,
+                # "n": self._n,
+                # "stream": True,
+                # "stream_options": {"include_usage": True},
+                # "user": self._user or openai.NOT_GIVEN,
             }
             # remove None values from the options
             opts = _strip_nones(opts)
 
-            messages = _build_oai_context(self._chat_ctx, id(self))
-
+            messages = _build_oai_context(self._chat_ctx, id(self), self._model)
+            truncated_messages = truncate_base64_images(messages)
+            logger.info(f"truncated_messages: {truncated_messages}")
+            
             stream = await self._client.chat.completions.create(
                 messages=messages,
                 model=self._model,
-                # **opts,
+                **opts,
                 temperature=0.4,
                 max_tokens=64,
                 stream=True
@@ -363,11 +403,3 @@ def _build_oai_context(
 def _strip_nones(data: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in data.items() if v is not None}
 
-
-def _get_api_key(env_var: str, key: str | None) -> str:
-    key = key or os.environ.get(env_var)
-    if not key:
-        raise ValueError(
-            f"{env_var} is required, either as argument or set {env_var} environmental variable"
-        )
-    return key
