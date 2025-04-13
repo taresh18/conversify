@@ -5,6 +5,7 @@ Main agent orchestration for the Conversify system.
 import asyncio
 import logging
 import os
+import json
 from typing import Optional, AsyncIterable, Union, Any
 
 from livekit import rtc
@@ -31,7 +32,7 @@ from memoripy import MemoryManager, JSONStorage
 from datetime import datetime
 logger = logging.getLogger(__name__)
 
-MEMORY_DIR = "./conversation_memory"
+MEMORY_DIR = config.get('memory.directory', "./conversation_memory")
 os.makedirs(MEMORY_DIR, exist_ok=True)
 
 class ConversifyAgent:
@@ -44,11 +45,15 @@ class ConversifyAgent:
         self.end_of_utterance_delay = 0
         self.llm_ttft = 0
         self.tts_ttfb = 0
-        # maintain conversation history
+        # video processing
+        self.video_task: Optional[asyncio.Task] = None
+        # metrics summary
+        self.usage_collector: Optional[metrics.UsageCollector] = None
+        # conversation history
         self.conversation_history = []
         # initialize memory manager
         self.memory_manager: Optional[MemoryManager] = None
-        self.participant_identity: Optional[str] = None # To store user ID
+        self.participant_identity: Optional[str] = None 
         
         
     def prewarm(self, proc: JobProcess):
@@ -167,7 +172,7 @@ class ConversifyAgent:
                         await asyncio.to_thread(
                             self.memory_manager.add_interaction,
                             prompt=user_prompt,
-                            output=assistant_response,
+                            response=assistant_response,
                             embedding=embedding,
                             concepts=concepts
                         )
@@ -182,24 +187,21 @@ class ConversifyAgent:
             logger.error(f"Failed during Memoripy history saving for {self.participant_identity}: {e}")
         
                 
-    async def application_shutdown(self, video_task: Optional[asyncio.Task], usage_collector: metrics.UsageCollector):
+    async def application_shutdown(self):
         """Shutdown the application."""
-        # Note: participant is no longer passed, use self.participant_identity
         logger.info("Application shutdown initiated")
         # cancel video task
-        if video_task and not video_task.done():
+        if self.video_task and not self.video_task.done():
             try:
-                video_task.cancel()
-                await video_task # Wait for cancellation (optional but good practice)
+                self.video_task.cancel()
+                await self.video_task
                 logger.info("Video processing task cancelled.")
-            except asyncio.CancelledError:
-                 logger.info("Video processing task already cancelled.")
             except Exception as e:
                  logger.error(f"Error cancelling video task: {e}")
 
         # log usage
         try:
-            summary = usage_collector.get_summary()
+            summary = self.usage_collector.get_summary()
             logger.info(f"Usage: ${summary}")
         except Exception as e:
             logger.error(f"Error getting usage summary: {e}")
@@ -207,108 +209,111 @@ class ConversifyAgent:
         # save conversation history
         await self._save_conversation_history()
         
+    
+    def initialize_memory(self, initial_chat_context: llm.ChatContext):
+        user_memory_file = os.path.join(MEMORY_DIR, f"{self.participant_identity}.json")
+        self.memory_manager = MemoryManager(
+            chat_model=ChatCompletionsModel() ,
+            embedding_model=VLLMEmbeddingModel() ,
+            storage=JSONStorage(user_memory_file)
+        )
+        logger.info(f"Initialized Memory for user {self.participant_identity} with storage {user_memory_file}")
+
+        # Load conversational memory for this user from file
+        initial_messages_from_memory = []
+        try:
+            short_term_history, _ = self.memory_manager.load_history()
+            num_interactions_to_load = config.get('memory.load_last_n', 6)
+            memory_interactions = short_term_history[-num_interactions_to_load:]
+
+            for interaction in memory_interactions:
+                if interaction.get('prompt'):
+                        initial_messages_from_memory.append(ChatMessage(role="user", content=interaction['prompt']))
+                if interaction.get('output'):
+                        initial_messages_from_memory.append(ChatMessage(role="assistant", content=interaction['output']))
+            # Prepend loaded history to the initial context
+            initial_chat_context.messages.extend(initial_messages_from_memory)
+            logger.info(f"Prepended {len(initial_messages_from_memory)} interactions to the initial context ({len(initial_chat_context.messages)} total messages).")
+
+        except FileNotFoundError:
+                logger.info(f"No previous history file found for {self.participant_identity}. Starting fresh.")
+        except Exception as e:
+            logger.error(f"Failed to load history via Memoripy for {self.participant_identity}: {e}")
+
+            
+    def initialize_models(self):
+        # Initialize models
+        stt_obj = WhisperSTT(
+            model=config.get('stt.whisper.model'),
+            device=config.get('stt.whisper.device'),
+            compute_type=config.get('stt.whisper.compute_type'),
+            language=config.get('stt.whisper.language', 'en'),
+            cache_dir=config.get('stt.whisper.cache_dir'),
+            model_cache_directory=config.get('stt.whisper.model_cache_directory'),
+        )
+        llm_obj = OpenaiLLM(
+            model=config.get('llm.openai.model'),
+            temperature=config.get('llm.openai.temperature'),
+            max_tokens=config.get('llm.openai.max_tokens'),
+            base_url=config.get('llm.openai.api_endpoint'),
+            api_key=config.get('llm.openai.api_key')
+        )
+        tts_obj = KokoroTTS(
+            model=config.get('tts.kokoro.model'),
+            voice=config.get('tts.kokoro.voice'),
+            speed=config.get('tts.kokoro.speed', 1.0),
+            base_url=config.get('tts.kokoro.api_endpoint')
+        )
+        # Initialize EOU detector
+        eou = None
+        if config.get('eou.enabled', True):
+            eou = turn_detector.EOUModel(unlikely_threshold=config.get('eou.unlikely_threshold', 0.0289))
+            logger.info("End-of-Utterance (EOU) detection enabled")
+        else:
+            logger.info("End-of-Utterance (EOU) detection disabled")
+            
+        return stt_obj, llm_obj, tts_obj, eou
+            
+            
         
     async def entrypoint(self, ctx: JobContext):
-        """Main entrypoint for the agent.
-        
-        Args:
-            ctx: The job context
-        """
-        # Load system prompts
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        llm_system_prompt_path = os.path.join(base_dir, 'prompts', 'llm_system_prompt.txt')
+        """Main entrypoint for the agent."""
+        llm_system_prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'prompts', 'llm_system_prompt.txt')
         llm_system_prompt = self._load_system_prompt(llm_system_prompt_path)
-        
-        # Create the chat context
+
         initial_chat_context = llm.ChatContext()
         initial_chat_context.messages.append(
-            llm.ChatMessage(
-                role="system",
-                content=llm_system_prompt
-            ),
+            llm.ChatMessage(role="system", content=llm_system_prompt)
         )
-        
+
         logger.info(f"Connecting to room {ctx.room.name}")
         await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
         
-        # Wait for the first participant *before* initializing memory/loading history
+        # Wait for the first participant 
         participant = await ctx.wait_for_participant()
-        # self.participant_identity = participant.identity # Store identity
-        # hardcode participant identity for now
+        # self.participant_identity = participant.identity
+        # hardcode participant identity for dev
         self.participant_identity = "identity-qfXx"
         logger.info(f"Participant connected: {self.participant_identity}")
+
+        # Initialize models
+        stt_obj, llm_obj, tts_obj, eou = self.initialize_models()
         
-        # *** Initialize MemoryManager HERE ***
-        try:
-            user_memory_file = os.path.join(MEMORY_DIR, f"{self.participant_identity}.json")
-            storage_option = JSONStorage(user_memory_file)
-            # Replace Dummy models with your actual wrappers/instances if needed
-            chat_model_for_memory = ChatCompletionsModel() # Or your wrapper
-            embedding_model_instance = VLLMEmbeddingModel() # Or your wrapper
-            self.memory_manager = MemoryManager(
-                chat_model=chat_model_for_memory,
-                embedding_model=embedding_model_instance,
-                storage=storage_option
-            )
-            logger.info(f"Initialized MemoryManager for user {self.participant_identity} with storage {user_memory_file}")
+        # Initialize MemoryManager 
+        self.initialize_memory(initial_chat_context)
 
-            # --- Load History HERE ---
-            initial_messages_from_memory = []
-            try:
-                short_term_history, _ = await asyncio.to_thread(self.memory_manager.load_history)
-                num_interactions_to_load = config.get('memory.load_last_n', 6)
-                recent_memoripy_interactions = short_term_history[-num_interactions_to_load:]
-
-                for interaction in recent_memoripy_interactions:
-                    if interaction.get('prompt'):
-                         initial_messages_from_memory.append(ChatMessage(role="user", content=interaction['prompt']))
-                    if interaction.get('response'):
-                         initial_messages_from_memory.append(ChatMessage(role="assistant", content=interaction['response']))
-                logger.info(f"Loaded last {len(recent_memoripy_interactions)} interactions from Memoripy.")
-                # Prepend loaded history to the initial context
-                initial_chat_context.messages.extend(initial_messages_from_memory)
-                logger.info(f"Prepended {len(initial_messages_from_memory)} interactions to the initial context.")
-
-            except FileNotFoundError:
-                 logger.info(f"No previous history file found for {self.participant_identity}. Starting fresh.")
-            except Exception as e:
-                logger.error(f"Failed to load history via Memoripy for {self.participant_identity}: {e}")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize MemoryManager: {e}")
-            # Decide how to proceed - maybe run without memory?
-            self.memory_manager = None
-        
-        # Initialize the models
-        try:
-            stt_obj = self._create_stt()
-            llm_obj = self._create_llm()
-            tts_obj = self._create_tts()
-            
-            # Initialize the end-of-utterance detector if enabled
-            eou = None
-            if config.get('eou.enabled', True):
-                eou = turn_detector.EOUModel(unlikely_threshold=config.get('eou.unlikely_threshold', 0.0289))
-                logger.info("End-of-Utterance (EOU) detection enabled")
-            else:
-                logger.info("End-of-Utterance (EOU) detection disabled")
-        except Exception as e:
-            logger.error(f"Error initializing models: {e}")
-            raise
-        
-        # Start the video processing loop if enabled
-        video_task = None
+        # Start video processing if enabled
         if config.get('video.enabled', True):
             logger.info("Video input is enabled, starting video processing")
-            video_task = asyncio.create_task(self._video_processing_loop(ctx))
-            
+            self.video_task = asyncio.create_task(self._video_processing_loop(ctx))
+
         # Create the agent
         self.agent = VoicePipelineAgent(
             vad=ctx.proc.userdata["vad"],
             stt=stt_obj,
             llm=llm_obj,
             tts=tts_obj,
-            turn_detector=eou, 
+            turn_detector=eou,
             chat_ctx=initial_chat_context,
             allow_interruptions=config.get('pipeline.allow_interruptions', True),
             interrupt_speech_duration=config.get('pipeline.interrupt_speech_duration', 0.5),
@@ -318,64 +323,25 @@ class ConversifyAgent:
             before_tts_cb=clean_text_for_tts,
             before_llm_cb=self.before_llm_vision_callback,
         )
-        
+
         # Set up metrics collection
-        usage_collector = metrics.UsageCollector()
-        self._setup_metrics_collection(usage_collector)
-        # set up callback to add user and agent messages to conversation history
+        self.usage_collector = metrics.UsageCollector()
+        self._setup_metrics_collection()
+        # Set up callback to add user and agent messages to conversation history
         self._setup_adding_user_message()
-        self._setup_adding_agent_message() 
-        
-        # add shutdown callback
-        ctx.add_shutdown_callback(lambda: self.application_shutdown(video_task, usage_collector))        
-            
+        self._setup_adding_agent_message()
+
+        # Add shutdown callback
+        ctx.add_shutdown_callback(lambda: self.application_shutdown())
+
         # Start the agent
         self.agent.start(ctx.room, participant)
-        
+
         # Greet the user
         await self.agent.say("Hey, how can I help you today?", allow_interruptions=True)
+   
         
-    def _create_stt(self) -> WhisperSTT:
-        """Create the STT model.
-        
-        Returns:
-            Configured WhisperSTT instance
-        """
-        return WhisperSTT(
-            model=config.get('stt.whisper.model'),
-            device=config.get('stt.whisper.device'),
-            compute_type=config.get('stt.whisper.compute_type'),
-            language=config.get('stt.whisper.language', 'en'),
-            cache_dir=config.get('stt.whisper.cache_dir'),
-            model_cache_directory=config.get('stt.whisper.model_cache_directory')
-        )
-        
-    def _create_llm(self) -> OpenaiLLM:
-        """Create the LLM model.
-        
-        Returns:
-            Configured OpenaiLLM instance
-        """
-        return OpenaiLLM(
-            model=config.get('llm.openai.model'),
-            temperature=config.get('llm.openai.temperature'),
-            parallel_tool_calls=config.get('llm.openai.parallel_tool_calls'),
-            max_tokens=config.get('llm.openai.max_tokens')
-        )
-        
-    def _create_tts(self) -> KokoroTTS:
-        """Create the TTS model.
-        
-        Returns:
-            Configured KokoroTTS instance
-        """
-        return KokoroTTS(
-            model=config.get('tts.kokoro.model'),
-            voice=config.get('tts.kokoro.voice'),
-            speed=config.get('tts.kokoro.speed', 1.0)
-        )
-        
-    def _setup_metrics_collection(self, usage_collector: metrics.UsageCollector):
+    def _setup_metrics_collection(self):
         """Set up metrics collection for the agent.
         
         Args:
@@ -384,7 +350,7 @@ class ConversifyAgent:
         @self.agent.on("metrics_collected")
         def on_metrics_collected(agent_metrics: metrics.AgentMetrics):
             metrics.log_metrics(agent_metrics)
-            usage_collector.collect(agent_metrics)
+            self.usage_collector.collect(agent_metrics)
             
             if isinstance(agent_metrics, PipelineEOUMetrics):
                 self.end_of_utterance_delay = agent_metrics.end_of_utterance_delay
@@ -410,13 +376,6 @@ class ConversifyAgent:
                 prompt = f.read().strip()
                 logger.info(f"System prompt loaded: {len(prompt)} characters")
                 return prompt
-        except FileNotFoundError:
-            logger.error(f"System prompt file not found: {prompt_path}")
-            # Fallback prompt
-            fallback = ("You are Conversify, a friendly assistant. Keep responses concise "
-                    "and focused on the query. Provide helpful, correct, and satisfying answers.")
-            logger.info(f"Using fallback prompt: {fallback}")
-            return fallback
         except Exception as e:
             logger.error(f"Error loading system prompt: {e}")
             return ("You are Conversify, a friendly and efficient assistant.")
@@ -495,7 +454,6 @@ class ConversifyAgent:
         user_text = last_message.content
         logger.debug(f"Checking user text for vision trigger: '{user_text}'")
 
-        # Decision Logic: When to add the image?
         # Simple keyword-based check (adjust keywords as needed)
         vision_keywords = ["see", "look", "picture", "image", "visual", "color", "this", 
                           "object", "view", "frame", "screen", "desk", "holding"]

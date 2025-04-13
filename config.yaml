@@ -63,9 +63,8 @@ llm:
     temperature: 0.4
     parallel_tool_calls: false
     max_tokens: 1024
-    api_url: "http://127.0.0.1"
-    api_port: 30000
-    api_path: "/v1"  
+    api_endpoint: "http://127.0.0.1:30000/v1"
+    api_key: "None"
 
 # Text-to-Speech Configuration
 tts:
@@ -74,13 +73,19 @@ tts:
     model: "tts-1"
     voice: af_heart
     speed: 1.0
-    api_url: "http://0.0.0.0"
-    api_port: 8880
-    api_path: "/v1" 
+    api_endpoint: "http://0.0.0.0:8880/v1"
   sample_rate: 24000
   channels: 1
 
 # Video Processing
 video:
   enabled: false
-  process_interval_ms: 200  
+  process_interval_ms: 200
+
+# Memory Configuration
+memory:
+  directory: "./conversation_memory"
+  load_last_n: 6
+  embedding:
+    vllm:
+      model: "mixedbread-ai/mxbai-embed-large-v1"
