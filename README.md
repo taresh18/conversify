@@ -11,22 +11,7 @@ Conversify is a highly responsive AI assistant that processes speech, understand
 - **Low Latency Processing**: Complete end-to-end processing in under 600ms
 - **Voice Input/Output**: Natural speech interaction
 - **Visual Understanding**: Can process and respond to visual information
-- **Configurable Components**: Easily swap out or upgrade individual modules
-
-## Architecture
-
-Conversify consists of three main components:
-
-1. **Speech-to-Text (STT)**
-   - Powered by the faster-whisper library for efficient speech recognition
-   - Supports multiple whisper models with configurable parameters
-
-2. **Language Model (LLM)**
-   - Compatible with any OpenAI-compliant API server
-   - Vision capabilities through models like Qwen2.5-VL-7B (recommended for vision)
-
-3. **Text-to-Speech (TTS)**
-   - Utilizes Kokoro TTS for high-quality voice synthesis
+- **Conversational Memory**: Retain context from past conversations
 
 ## Prerequisites
 
@@ -79,11 +64,13 @@ Key configuration options:
 
 ## TODO
 
-- Add conversational memory for maintaining context across interactions
+- Improve vision capabilities
+- Imporve memory feature
 - Integrate Orpheus TTS for enhanced voice quality
 - Tool calling support ?
 
 ## References
 
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Whisper implementation with CTranslate2
-- [Kokoro FastAPI](https://github.com/remsky/Kokoro-FastAPI) - OpenAI-compatible TTS server
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [Kokoro FastAPI](https://github.com/remsky/Kokoro-FastAPI) 
+- [Memoripy](https://github.com/caspianmoon/memoripy) 
