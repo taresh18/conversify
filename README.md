@@ -44,7 +44,7 @@ Conversify is a highly responsive AI assistant that processes speech, understand
 
 ```bash
 cd conversify
-python main.py prod
+python main.py start
 ```
 
 You can interact with application using the livekit agents playground [livekit agents playground](https://agents-playground.livekit.io/) 
