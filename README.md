@@ -35,9 +35,9 @@ Conversify is a highly responsive AI assistant that processes speech, understand
 3. Configure environment:
    ```bash
    # Create a local environment file from example
-   cp conversify/.env.example
+   cp .env.example .env.local
    # Edit with your settings
-   nano conversify/.env.local
+   nano .env.local
    ```
 
 ## Running the Application
