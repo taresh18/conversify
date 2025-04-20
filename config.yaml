@@ -1,91 +1,64 @@
-# Conversify Configuration
+agent:
+  env_file: ".env.local"
+  instructions_file: conversify/prompts/llm.txt
+  greeting: "Hey! How are you doing today?"
+  goodbye: "Goodbye! Have a great day!"
+  default_participant_identity: "identity-qfXx"
+  use_eou: false                                      # livekit turn detection
+  use_background_noise_removal: true                  # uses Krisp BVC noise cancellation
+  use_background_audio: false                         # plays office background audio and keyboard typing sound while the agent speaks
 
-# Logging Configuration
-logging:
-  level: DEBUG  # DEBUG, INFO, WARNING, ERROR
-  file: app.log
-  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-
-# LiveKit Configuration
-livekit:
-  auto_subscribe: SUBSCRIBE_ALL  # Options: SUBSCRIBE_ALL, NONE
-  room:
-    name: conversify-room
-
-# Worker Configuration
-worker:
-  job_memory_warn_mb: 1900  # Memory usage warning threshold in MB
-  load_threshold: 1  # CPU load threshold for worker
-  job_memory_limit_mb: 10000  # Maximum memory limit in MB
-
-# Voice Pipeline Configuration
-pipeline:
-  allow_interruptions: true
-  interrupt_speech_duration: 0.5
-  interrupt_min_words: 0
-  min_endpointing_delay: 0.3
-  preemptive_synthesis: true
-
-# Voice Activity Detection
-vad:
-  model: silero
-  min_speech_duration: 0.20
-  min_silence_duration: 0.50
-  prefix_padding_duration: 0.5
-  max_buffered_speech: 60.0
-  activation_threshold: 0.5
-  force_cpu: false
-  sample_rate: 16000
-
-# End of Utterance Detection
-eou:
-  enabled: true
-  model: turn_detector
-  unlikely_threshold: 0.0289
-
-# Speech-to-Text Configuration
 stt:
-  implementation: whisper
   whisper:
-    model: "deepdml/faster-whisper-large-v3-turbo-ct2"
-    device: cuda
-    compute_type: float16
-    language: en
-    cache_dir: models
-    model_cache_directory: "/Workspace/tr/repos/s2s/models"
-    warmup_audio: "/Workspace/tr/repos/s2s/input/warmup_audio.wav"
+    language: "en"                      
+    model: "deepdml/faster-whisper-large-v3-turbo-ct2" 
+    device: "cuda"                     
+    compute_type: "float16"             
+    model_cache_directory: "conversify/data/models_cache"  
+    warmup_audio: "conversify/data/warmup_audio.wav"  
 
-# Language Model Configuration
 llm:
-  implementation: openai
-  openai:
-    model: "Qwen/Qwen2.5-VL-3B-Instruct-AWQ"
-    temperature: 0.4
-    parallel_tool_calls: false
-    max_tokens: 1024
-    api_endpoint: "http://127.0.0.1:30000/v1"
-    api_key: "None"
+  base_url: "http://127.0.0.1:30000/v1" 
+  api_key: "NULL"                      
+  model: "Qwen/Qwen2.5-VL-7B-Instruct-AWQ"                 
+  temperature: 0.4                  
+  parallel_tool_calls: false
+  tool_choice: "auto"
 
-# Text-to-Speech Configuration
 tts:
-  implementation: kokoro
   kokoro:
-    model: "tts-1"
-    voice: af_heart
-    speed: 1.0
-    api_endpoint: "http://0.0.0.0:8880/v1"
-  sample_rate: 24000
-  channels: 1
+    base_url: "http://0.0.0.0:8880/v1" 
+    api_key: "NULL"                     
+    model: "tts-1"                      
+    voice: "af_heart"                   
+    speed: 1.0     
 
-# Video Processing
-video:
-  enabled: false
-  process_interval_ms: 200
+vad:
+  min_speech_duration: 0.20             # Minimum duration (seconds) for speech detection
+  min_silence_duration: 0.50            # Minimum silence duration (seconds) to detect end of speech
+  prefix_padding_duration: 0.5          # Padding duration (seconds) before detected speech
+  max_buffered_speech: 60.0             # Maximum duration (seconds) of buffered speech
+  activation_threshold: 0.5             # Threshold for voice activation detection
+  force_cpu: false                      # Force VAD to run on CPU instead of GPU
+  sample_rate: 16000  
 
-# Memory Configuration
+vision:
+  use: true                            
+  video_frame_interval: 0.2   
+
 memory:
-  directory: "./conversation_memory"
-  load_last_n: 6
-  embedding:
-    vllm:
-      model: "mixedbread-ai/mxbai-embed-large-v1"
+  use: false                             
+  dir: "conversify/data/memory_store"              
+  load_last_n: 6       
+
+embedding:
+  vllm_model_name: "mixedbread-ai/mxbai-embed-large-v1"                             
+
+worker:
+  job_memory_warn_mb: 1900              
+  load_threshold: 1.0                   
+  job_memory_limit_mb: 10000            
+
+logging:
+  level: "DEBUG"                         
+  file: "logs/app.log"                

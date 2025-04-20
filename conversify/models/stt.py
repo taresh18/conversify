@@ -1,30 +1,22 @@
-"""
-Speech-to-Text implementation for the Conversify system.
-"""
-
 import dataclasses
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import numpy as np
 import soundfile as sf
-import torch
 from faster_whisper import WhisperModel
 
 from livekit import rtc
 from livekit.agents import (
     APIConnectionError,
     APIConnectOptions,
-    APIStatusError,
-    APITimeoutError,
     stt,
 )
 from livekit.agents.utils import AudioBuffer
 
-from core.config import config
-from utils import WhisperModels, find_time
+from .utils import WhisperModels, find_time
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +25,10 @@ class WhisperOptions:
     """Configuration options for WhisperSTT."""
     language: str
     model: WhisperModels | str
-    device: str | None = None
-    compute_type: str | None = None
-    cache_dir: str | None = None
-    model_cache_directory: str | None = None
+    device: str | None
+    compute_type: str | None
+    model_cache_directory: str | None
+    warmup_audio: str | None
 
 
 class WhisperSTT(stt.STT):
@@ -44,84 +36,61 @@ class WhisperSTT(stt.STT):
     
     def __init__(
         self,
-        *,
-        language: str = None,
-        model: WhisperModels | str = None,
-        device: str | None = None,
-        compute_type: str | None = None,
-        cache_dir: str | None = None,
-        model_cache_directory: str | None = None,
+        config: Dict[str, Any]
     ):
         """Initialize the WhisperSTT instance.
         
         Args:
-            language: Language to detect
-            model: Whisper model to use
-            device: Compute device (cuda/cpu)
-            compute_type: Compute type (float16/int8)
-            cache_dir: Directory to cache models
-            model_cache_directory: Directory to store downloaded models from Hugging Face
+            config: Configuration dictionary (from config.yaml)
         """
         super().__init__(
             capabilities=stt.STTCapabilities(streaming=False, interim_results=False)
         )
+               
+        stt_config = config['stt']['whisper']
         
-        # Load from config if not provided
-        language = language or config.get('stt.whisper.language', 'en')
-        model = model or config.get('stt.whisper.model', 'large-v3')
-        device = device or config.get('stt.whisper.device')
-        compute_type = compute_type or config.get('stt.whisper.compute_type')
-        cache_dir = cache_dir or config.get('stt.whisper.cache_dir', 'models')
-        model_cache_directory = model_cache_directory or config.get('stt.whisper.model_cache_directory', './model_cache')
+        language = stt_config['language']
+        model = stt_config['model']
+        device = stt_config['device']
+        compute_type = stt_config['compute_type']
+        model_cache_directory = stt_config['model_cache_directory']
+        warmup_audio = stt_config['warmup_audio']
 
         self._opts = WhisperOptions(
             language=language,
             model=model,
             device=device,
             compute_type=compute_type,
-            cache_dir=cache_dir,
             model_cache_directory=model_cache_directory,
+            warmup_audio=warmup_audio
         )
         
         self._model = None
         self._initialize_model()
         
         # Warmup the model with a sample audio if available
-        warmup_path = config.get('stt.whisper.warmup_audio', '/Workspace/tr/repos/s2s/input/warmup_audio.wav')
-        if os.path.exists(warmup_path):
-            self._warmup(warmup_path)
+        if warmup_audio and os.path.exists(warmup_audio):
+            self._warmup(warmup_audio)
 
     def _initialize_model(self):
         """Initialize the Whisper model."""
         device = self._opts.device
         compute_type = self._opts.compute_type
         
-        # Auto-detect device and compute type if not specified
-        if device is None or compute_type is None:
-            if torch.cuda.is_available():
-                device = "cuda"
-                compute_type = "float16"
-            else:
-                device = "cpu"
-                compute_type = "int8"
-        
         logger.info(f"Using device: {device}, with compute: {compute_type}")
         
         # Ensure cache directories exist
-        cache_dir = self._opts.cache_dir
         model_cache_dir = self._opts.model_cache_directory
         
-        os.makedirs(cache_dir, exist_ok=True)
         if model_cache_dir:
             os.makedirs(model_cache_dir, exist_ok=True)
             logger.info(f"Using model cache directory: {model_cache_dir}")
         
-        logger.info(f"Loading model from directory: {cache_dir}")
         self._model = WhisperModel(
             model_size_or_path=str(self._opts.model),
             device=device,
             compute_type=compute_type,
-            download_root=model_cache_dir or cache_dir  # Use model_cache_directory if provided, otherwise fall back to cache_dir
+            download_root=model_cache_dir
         )
         logger.info("Whisper model loaded successfully")
 

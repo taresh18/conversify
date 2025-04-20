@@ -1,76 +1,176 @@
-# Conversify
+# Conversify ✨
 
-A low-latency voice and vision-enabled AI assistant built with LiveKit.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Overview
+Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assistant built on LiveKit. This project demonstrates highly responsive conversational AI workflows, leveraging locally hosted models.
 
-Conversify is a highly responsive AI assistant that processes speech, understands visual input, and generates natural spoken responses with remarkably low latency. It integrates multiple AI components into a seamless conversation system.
+---
+
+## Table of Contents
+
+1. [Key Features](#key-features)
+2. [Prerequisites](#prerequisites)
+3. [Installation](#installation)
+4. [Running the Application](#running-the-application)
+5. [Configuration](#configuration)
+6. [Project Structure](#project-structure)
+7. [TODO](#todo)
+8. [References](#references)
+9. [License](#license)
+
+---
 
 ## Key Features
 
-- **Low Latency Processing**: Complete end-to-end processing in under 600ms
-- **Voice Input/Output**: Natural speech interaction
-- **Visual Understanding**: Can process and respond to visual information
-- **Conversational Memory**: Retain context from past conversations
+- ⚡ **Low Latency**: End-to-end response time under 600 ms.
+- 🗣️ **Real‑time Voice**: Natural conversation using local STT and TTS services.
+- 🧠 **Local LLM Integration**: Compatible with any OpenAI‑style API (e.g., SGLang, vLLM, Ollama).
+- 👀 **Basic Vision**: Processes video frames with multimodal LLM prompts.
+- 💾 **Conversational Memory**: Persists context across user sessions.
+- 🔧 **Configurable**: All settings managed via `config/config.yaml`.
+
+---
 
 ## Prerequisites
 
-- Python 3.8+
-- CUDA-compatible GPU 
-- LiveKit server
+- **OS**: Linux or WSL on Windows (tested)
+- **Python**: 3.11+
+- **Services**:
+  - LiveKit Server Cloud - sign up at https://cloud.livekit.io and create a project
+  - An LLM inference server with OpenAI-compatible API (e.g., SGLang, vLLM, Ollama)
+  - Kokoro FastAPI TTS server (https://github.com/remsky/Kokoro-FastAPI)
+
+---
 
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/username/conversify.git
-   cd conversify
-   ```
+1. **Clone the repository**
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+    ```bash
+    git clone https://github.com/taresh18/conversify-speech.git
+    cd conversify-speech
+    ```
 
-3. Configure environment:
-   ```bash
-   # Create a local environment file from example
-   cp .env.example .env.local
-   # Edit with your settings
-   nano .env.local
-   ```
+2. **Create a virtual environment** (recommended)
+
+    ```bash
+    python -m venv venv
+    source venv/bin/activate    # Linux/macOS
+    # venv\Scripts\activate     # Windows
+    ```
+
+3. **Install dependencies**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Configure environment variables**
+
+    ```bash
+    cp .env.example .env.local
+    nano .env.local  # Add your LiveKit server and project credentials
+    ```
+
+5. **Update `config/config.yaml`**
+
+    - Set LLM API endpoint and model names
+    - Configure STT/TTS server URLs and parameters
+    - Adjust vision and memory settings as needed
+
+---
 
 ## Running the Application
 
-```bash
-cd conversify
-python main.py start
-```
+1. **Start the LLM server**
 
-You can interact with application using the livekit agents playground [livekit agents playground](https://agents-playground.livekit.io/) 
+    ```bash
+    # this starts a sglang server
+    chmod +x ./scripts/run_llm.sh
+    ./scripts/run_llm.sh &
+    ```
+
+2. **Start the Kokoro TTS server**
+
+    ```bash
+    chmod +x ./scripts/run_kokoro.sh
+    ./scripts/run_kokoro.sh &
+    ```
+
+3. **Launch Conversify**
+
+    ```bash
+    chmod +x ./scripts/run_app.sh
+    ./scripts/run_app.sh
+    ```
+
+4. **Interact via LiveKit Agents Playground**
+
+    - Navigate to https://agents-playground.livekit.io
+    - Select your LiveKit project
+    - Connect to the room and begin conversation
+
+---
 
 ## Configuration
 
-All settings are managed through:
-- `.env.local` file for API keys and endpoints
-- `config.yaml` for component settings and parameters
+All runtime settings are in `config/config.yaml`. Key options include:
 
-Key configuration options:
-- STT model selection and parameters
-- LLM endpoints and model selection
-- TTS voice and server settings
-- Video processing toggle
-- Voice activity detection parameters
+- **STT**: model selection and parameters
+- **LLM**: endpoint URLs and model names
+- **TTS**: voice options and server settings
+- **Vision**: enable/disable frame analysis and thresholds
+- **Memory**: persistence and retrieval parameters
+- **Logging**: level and file path (`app.log`)
+
+Secrets and credentials reside in `.env.local`, following the template in `.env.example`.
+
+---
+
+## Project Structure
+
+```plaintext
+conversify-speech/
+├── conversify/
+│   ├── core/               # Core agent logic, vision, memory
+│   ├── data/               # Local memory store and model cache files
+│   ├── models/             # Interfaces for interfaces for STT, TTS, LLM
+│   ├── prompts/            # System prompts
+│   ├── utils/              # Utilities 
+│   └── main.py             # Main application entry point
+├── scripts/
+│   ├── run_llm.sh
+│   ├── run_kokoro.sh
+│   └── run_app.sh
+├── .env.example            # Template for environment variables
+├── .env.local              # Local secrets (ignored)
+├── config.yaml             # All application settings 
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+---
 
 ## TODO
 
-- Improve vision capabilities
-- Imporve memory feature
-- Integrate Orpheus TTS for enhanced voice quality
-- Tool calling support ?
+- Enhance vision-triggered actions and robustness
+- Optimize memory retrieval strategies
+- Support alternative TTS engines (e.g., Orpheus, Sesame-CSM)
+- Tool calling
+
+---
 
 ## References
 
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- [Kokoro FastAPI](https://github.com/remsky/Kokoro-FastAPI) 
-- [Memoripy](https://github.com/caspianmoon/memoripy) 
+- LiveKit Agents: https://github.com/livekit/agents
+- Faster Whisper: https://github.com/SYSTRAN/faster-whisper
+- Kokoro FastAPI: https://github.com/remsky/Kokoro-FastAPI
+- Memoripy: https://github.com/caspianmoon/memoripy
+
+---
+
+## License
+
+This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
