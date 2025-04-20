@@ -4,6 +4,10 @@
 
 Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assistant built on LiveKit. This project demonstrates highly responsive conversational AI workflows, leveraging locally hosted models.
 
+## Demo Video
+
+[![Watch the demo](assets/thumbnail.jpg)](https://youtu.be/Biva5VGV5Pg)
+
 ---
 
 ## Table of Contents

@@ -35,6 +35,7 @@ class ConversifyAgent(Agent):
         # Get instructions from the config for the Agent constructor
         super().__init__(
             instructions=agent_config['instructions'], 
+            allow_interruptions=agent_config['allow_interruptions']
         )
         
         # Use default participant identity if it's provided and not empty

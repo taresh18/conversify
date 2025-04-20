@@ -7,6 +7,7 @@ agent:
   use_eou: false                                      # livekit turn detection
   use_background_noise_removal: true                  # uses Krisp BVC noise cancellation
   use_background_audio: false                         # plays office background audio and keyboard typing sound while the agent speaks
+  allow_interruptions: True                           # reset tts on user iterruption
 
 stt:
   whisper:
@@ -35,7 +36,7 @@ tts:
 
 vad:
   min_speech_duration: 0.20             # Minimum duration (seconds) for speech detection
-  min_silence_duration: 0.50            # Minimum silence duration (seconds) to detect end of speech
+  min_silence_duration: 0.40            # Minimum silence duration (seconds) to detect end of speech
   prefix_padding_duration: 0.5          # Padding duration (seconds) before detected speech
   max_buffered_speech: 60.0             # Maximum duration (seconds) of buffered speech
   activation_threshold: 0.5             # Threshold for voice activation detection
