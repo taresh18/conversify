@@ -1,6 +1,9 @@
-.env.local
-*.log
+logs/*
 __pycache__/
-*.pyc
-temp/*
-conversation_memory/*
+*/__pycache__/
+**/__pycache__
+***/__pycache__
+.env.local
+conversify/data/memory_store/*
+conversify/data/models_cache/*
+KMS/

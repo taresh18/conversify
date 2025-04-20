@@ -1,11 +1,6 @@
-"""
-Text-to-Speech implementation for the Conversify system.
-"""
-
 import logging
-import re
 from dataclasses import dataclass
-from typing import AsyncIterable, Union, Any
+from typing import Any, Dict
 
 import httpx
 import openai
@@ -25,8 +20,7 @@ from livekit.agents.types import (
 )
 from livekit.agents.utils import is_given
 
-from core.config import config
-from utils import TTSModels, TTSVoices, find_time
+from .utils import TTSModels, TTSVoices, find_time
 
 logger = logging.getLogger(__name__)
 
@@ -46,46 +40,24 @@ class KokoroTTS(tts.TTS):
     
     def __init__(
         self,
-        *,
-        model: Union[TTSModels, str] = None,
-        voice: Union[TTSVoices, str] = None,
-        speed: float = 1.0,
-        base_url: NotGivenOr[str] = NOT_GIVEN,
-        api_key: NotGivenOr[str] = NOT_GIVEN,
+        config: Dict[str, Any],
         client: openai.AsyncClient | None = None,
     ) -> None:
         """Initialize the KokoroTTS instance.
         
         Args:
-            model: TTS model to use
-            voice: Voice to use
-            speed: Speech speed multiplier
-            base_url: API base URL
-            api_key: API key
             client: Optional pre-configured OpenAI AsyncClient
+            config: Configuration dictionary (from config.yaml)
         """
-        # Load from config if not provided
-        model = model or config.get('tts.kokoro.model', 'tts-1')
-        voice = voice or config.get('tts.kokoro.voice', 'af_heart')
-        speed = speed or config.get('tts.kokoro.speed', 1.0)
+        tts_config = config['tts']['kokoro']
         
-        # Use environment variables if not provided
-        if is_given(api_key) is False:
-            api_key = config.get_env('KOKORO_TTS_API_KEY', None)
-            
-        # If base_url is not explicitly set, build it from config
-        if is_given(base_url) is False:
-            api_url = config.get('tts.kokoro.api_url', 'http://0.0.0.0')
-            api_port = config.get('tts.kokoro.api_port', 8880)
-            api_path = config.get('tts.kokoro.api_path', '/v1')
-            
-            # Build the complete base URL
-            base_url = f"{api_url}:{api_port}{api_path}"
-            logger.info(f"Using TTS API URL: {base_url}")
-            
-            # If base_url from config is empty, try environment variable
-            if not base_url:
-                base_url = config.get_env('KOKORO_TTS_API_BASE_URL', None)
+        model = tts_config['model']
+        voice = tts_config['voice']
+        speed = tts_config['speed']
+        api_key = tts_config['api_key']
+        base_url = tts_config['base_url']
+        
+        logger.info(f"Using TTS API URL: {base_url}")
 
         super().__init__(
             capabilities=tts.TTSCapabilities(
@@ -103,8 +75,8 @@ class KokoroTTS(tts.TTS):
 
         self._client = client or openai.AsyncClient(
             max_retries=0,
-            api_key=api_key if is_given(api_key) else None,
-            base_url=base_url if is_given(base_url) else None,
+            api_key=api_key,
+            base_url=base_url,
             http_client=httpx.AsyncClient(
                 timeout=httpx.Timeout(connect=15.0, read=5.0, write=5.0, pool=5.0),
                 follow_redirects=True,
@@ -237,42 +209,3 @@ class KokoroTTSStream(tts.ChunkedStream):
             )
         except Exception as e:
             raise APIConnectionError() from e
-
-
-async def clean_text_for_tts(agent: Any, text: Union[str, AsyncIterable[str]]) -> str:
-    """Clean text to be more suitable for TTS.
-    
-    Args:
-        agent: The voice pipeline agent (needed for callback interface)
-        text: Text to clean, can be a string or async iterable of strings
-        
-    Returns:
-        Cleaned text
-    """
-    logger.info(f"before tts cb: {text}")
-    
-    def clean(text_chunk: str) -> str:
-        # Remove special tags
-        cleaned = text_chunk.replace("<think>", "").replace("</think>", "")
-        # Remove code blocks enclosed in triple backticks
-        cleaned = re.sub(r'```.*?```', '', cleaned, flags=re.DOTALL)
-        # Remove code blocks enclosed in triple single quotes
-        cleaned = re.sub(r"'''(.*?)'''", r'\1', cleaned, flags=re.DOTALL)
-        # Remove markdown bold/italic markers
-        cleaned = re.sub(r'(\*\*|__)(.*?)\1', r'\2', cleaned)
-        cleaned = re.sub(r'(\*|_)(.*?)\1', r'\2', cleaned)
-        # Remove inline code markers (backticks)
-        cleaned = re.sub(r'`([^`]*)`', r'\1', cleaned)
-        # Remove LaTeX inline delimiters: remove one or more backslashes preceding "(" or ")"
-        cleaned = re.sub(r'\\+\(', '', cleaned)
-        cleaned = re.sub(r'\\+\)', '', cleaned)
-        return cleaned
-
-    if isinstance(text, str):
-        return clean(text)
-    else:
-        # For streaming text, collect and concatenate cleaned chunks
-        cleaned_chunks = []
-        async for chunk in text:
-            cleaned_chunks.append(clean(chunk))
-        return "".join(cleaned_chunks) 
