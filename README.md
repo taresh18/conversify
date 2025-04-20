@@ -1,6 +1,6 @@
 # Conversify ✨
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assistant built on LiveKit. This project demonstrates highly responsive conversational AI workflows, leveraging locally hosted models.
 
@@ -36,9 +36,9 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 - **OS**: Linux or WSL on Windows (tested)
 - **Python**: 3.11+
 - **Services**:
-  - LiveKit Server Cloud - [sign up](https://cloud.livekit.io/login) and create a project
+  - LiveKit Server Cloud (sign up at https://cloud.livekit.io)
   - An LLM inference server with OpenAI-compatible API (e.g., SGLang, vLLM, Ollama)
-  - Kokoro FastAPI TTS server
+  - Kokoro FastAPI TTS server (https://github.com/remsky/Kokoro-FastAPI)
 
 ---
 
@@ -56,7 +56,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
     ```bash
     python -m venv venv
     source venv/bin/activate    # Linux/macOS
-    # venv\Scripts\activate     # Windows
+    # venv\Scripts\activate   # Windows
     ```
 
 3. **Install dependencies**
@@ -69,7 +69,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
     ```bash
     cp .env.example .env.local
-    nano .env.local  # Add your LiveKit server and project credentials
+    nano .env.local  # Add your LiveKit and other credentials
     ```
 
 5. **Update `config/config.yaml`**
@@ -82,10 +82,11 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 ## Running the Application
 
-1. **Start the LLM server**
+Ensure all external services are running before starting Conversify.
+
+1. **Start the LLM server** (example using provided script)
 
     ```bash
-    # this starts a sglang server
     chmod +x ./scripts/run_llm.sh
     ./scripts/run_llm.sh &
     ```
@@ -106,9 +107,9 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 4. **Interact via LiveKit Agents Playground**
 
-    - Navigate to [agents-playground](https://agents-playground.livekit.io)
-    - Select your project
-    - Connect to the room and begin conversation
+    - Navigate to https://agents-playground.livekit.io
+    - Select your LiveKit project and room
+    - Join and begin conversation
 
 ---
 
@@ -131,20 +132,23 @@ Secrets and credentials reside in `.env.local`, following the template in `.env.
 
 ```plaintext
 conversify-speech/
+├── config/
+│   └── config.yaml         # All application settings
 ├── conversify/
-│   ├── core/               # Core agent logic, vision, memory
-│   ├── data/               # Local memory store and model cache files
-│   ├── models/             # Interfaces for interfaces for STT, TTS, LLM
-│   ├── prompts/            # System prompts
-│   ├── utils/              # Utilities 
-│   └── main.py             # Main application entry point
+│   ├── core/               # Orchestration and agent logic
+│   ├── stt/                # Speech-to-text client
+│   ├── tts/                # Text-to-speech client
+│   ├── llm/                # LLM integration client
+│   ├── livekit/            # LiveKit session & media management
+│   └── utils/              # Logger and shared utilities
+├── prompts/
+│   └── llm.txt             # System prompt for LLM
 ├── scripts/
 │   ├── run_llm.sh
 │   ├── run_kokoro.sh
 │   └── run_app.sh
 ├── .env.example            # Template for environment variables
 ├── .env.local              # Local secrets (ignored)
-├── config.yaml             # All application settings 
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -152,12 +156,13 @@ conversify-speech/
 
 ---
 
-## TODO
+## TODO / Future Ideas
 
 - Enhance vision-triggered actions and robustness
 - Optimize memory retrieval strategies
 - Support alternative TTS engines (e.g., Orpheus, Sesame-CSM)
-- Tool calling
+- Add tool-calling capabilities for structured LLM plugins
+- Include CI/CD and automated testing workflows
 
 ---
 
@@ -172,5 +177,5 @@ conversify-speech/
 
 ## License
 
-This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is released under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
