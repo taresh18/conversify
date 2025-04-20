@@ -36,9 +36,9 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 - **OS**: Linux or WSL on Windows (tested)
 - **Python**: 3.11+
 - **Services**:
-  - LiveKit Server Cloud - sign up at https://cloud.livekit.io and create a project
+  - LiveKit Server Cloud - [sign up](https://cloud.livekit.io/login) and create a project
   - An LLM inference server with OpenAI-compatible API (e.g., SGLang, vLLM, Ollama)
-  - Kokoro FastAPI TTS server (https://github.com/remsky/Kokoro-FastAPI)
+  - Kokoro FastAPI TTS server
 
 ---
 
@@ -106,8 +106,8 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 4. **Interact via LiveKit Agents Playground**
 
-    - Navigate to https://agents-playground.livekit.io
-    - Select your LiveKit project
+    - Navigate to [agents-playground](https://agents-playground.livekit.io)
+    - Select your project
     - Connect to the room and begin conversation
 
 ---
