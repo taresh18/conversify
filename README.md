@@ -160,7 +160,7 @@ conversify-speech/
 
 ---
 
-## TODO / Future Ideas
+## TODO
 
 - Enhance vision-triggered actions and robustness
 - Optimize memory retrieval strategies
