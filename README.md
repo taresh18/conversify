@@ -163,11 +163,10 @@ conversify-speech/
 ## TODO
 
 - Enhance vision-triggered actions and robustness
-- Optimize memory retrieval strategies
+- Optimize memory retrieval strategy
 - Support alternative TTS engines (e.g., Orpheus, Sesame-CSM)
-- Add tool-calling capabilities for structured LLM plugins
-- Include CI/CD and automated testing workflows
-
+- Add tool-calling capabilities
+  
 ---
 
 ## References
