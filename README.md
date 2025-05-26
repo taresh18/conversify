@@ -51,8 +51,8 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 1. **Clone the repository**
 
     ```bash
-    git clone https://github.com/taresh18/conversify-speech.git
-    cd conversify-speech
+    git clone https://github.com/taresh18/conversify.git
+    cd conversify
     ```
 
 2. **Create a virtual environment** (recommended)
@@ -135,7 +135,7 @@ Secrets and credentials reside in `.env.local`, following the template in `.env.
 ## Project Structure
 
 ```plaintext
-conversify-speech/
+conversify/
 ├── config/
 │   └── config.yaml         # All application settings
 ├── conversify/
