@@ -1,4 +1,4 @@
-# Conversify ✨
+# Conversify 🗣️ ✨
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
@@ -8,23 +8,8 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 [![Watch the demo](assets/thumbnail.jpg)](https://youtu.be/Biva5VGV5Pg)
 
----
 
-## Table of Contents
-
-1. [Key Features](#key-features)
-2. [Prerequisites](#prerequisites)
-3. [Installation](#installation)
-4. [Running the Application](#running-the-application)
-5. [Configuration](#configuration)
-6. [Project Structure](#project-structure)
-7. [TODO](#todo)
-8. [References](#references)
-9. [License](#license)
-
----
-
-## Key Features
+## ✨ Key Features
 
 - ⚡ **Low Latency**: End-to-end response time under 600 ms.
 - 🗣️ **Real‑time Voice**: Natural conversation using local STT and TTS services.
@@ -35,7 +20,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 ---
 
-## Prerequisites
+## ⚙️ Prerequisites
 
 - **OS**: Linux or WSL on Windows (tested)
 - **Python**: 3.11+
@@ -46,7 +31,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 ---
 
-## Installation
+## 🛠️ Installation
 
 1. **Clone the repository**
 
@@ -84,7 +69,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
 ---
 
-## Running the Application
+## 🏃 Running the Application
 
 Ensure all external services are running before starting Conversify.
 
@@ -117,7 +102,7 @@ Ensure all external services are running before starting Conversify.
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 All runtime settings are in `config/config.yaml`. Key options include:
 
@@ -132,7 +117,7 @@ Secrets and credentials reside in `.env.local`, following the template in `.env.
 
 ---
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```plaintext
 conversify/
@@ -160,16 +145,7 @@ conversify/
 
 ---
 
-## TODO
-
-- Enhance vision-triggered actions and robustness
-- Optimize memory retrieval strategy
-- Support alternative TTS engines (e.g., Orpheus, Sesame-CSM)
-- Add tool-calling capabilities
-  
----
-
-## References
+## 📚 References
 
 - LiveKit Agents: https://github.com/livekit/agents
 - Faster Whisper: https://github.com/SYSTRAN/faster-whisper
@@ -178,7 +154,7 @@ conversify/
 
 ---
 
-## License
+## 📜 License
 
 This project is released under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
