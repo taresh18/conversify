@@ -52,6 +52,7 @@ Conversify is a real‑time, low‑latency, voice- and vision-enabled AI assista
 
     ```bash
     pip install -r requirements.txt
+    python -m conversify.main download-files 
     ```
 
 4. **Configure environment variables**
